@@ -1,0 +1,88 @@
+# 카메라 설정
+camera:
+  # 카메라 인덱스 (라즈베리파이 카메라 모듈)
+  left_camera_index: 0
+  right_camera_index: 1
+  
+  # 해상도 설정
+  resolution:
+    width: 640
+    height: 480
+  
+  # FPS 설정
+  fps: 30
+  
+  # 카메라 워밍업 시간 (초)
+  warmup_time: 2.0
+
+# 스테레오 캘리브레이션 설정
+stereo_calibration:
+  # 체스보드 설정
+  chessboard:
+    # 내부 코너 수 (가로, 세로)
+    pattern_size: [9, 6]
+    # 체스보드 한 칸의 크기 (mm)
+    square_size: 25.0
+  
+  # 캘리브레이션 이미지 수
+  num_calibration_images: 20
+  
+  # 캘리브레이션 데이터 저장 경로
+  calibration_file: "data/stereo_calibration.pkl"
+
+# Mediapipe 손 추적 설정
+hand_tracking:
+  # 최대 손 개수
+  max_num_hands: 2
+  
+  # 감지 신뢰도 임계값
+  min_detection_confidence: 0.5
+  
+  # 추적 신뢰도 임계값
+  min_tracking_confidence: 0.5
+  
+  # 디스플레이 설정
+  display:
+    show_landmarks: true
+    show_fps: true
+
+# 모터 제어 설정
+motors:
+  # DC 모터 설정 (L298N 드라이버 예시)
+  dc_motors:
+    motor1:
+      enable_pin: 18  # PWM 핀 (GPIO 18)
+      in1_pin: 23     # 방향 제어 핀 1 (GPIO 23)
+      in2_pin: 24     # 방향 제어 핀 2 (GPIO 24)
+      type: "l298n"
+    
+    motor2:
+      enable_pin: 12  # PWM 핀 (GPIO 12)
+      in1_pin: 5      # 방향 제어 핀 1 (GPIO 5)
+      in2_pin: 6      # 방향 제어 핀 2 (GPIO 6)
+      type: "l298n"
+  
+  # 스테퍼 모터 설정 (DRV8825 드라이버 예시)
+  stepper_motors:
+    stepper1:
+      step_pin: 16      # STEP 신호 핀 (GPIO 16)
+      dir_pin: 20       # DIR 신호 핀 (GPIO 20)
+      enable_pin: 21    # ENABLE 핀 (GPIO 21)
+      steps_per_revolution: 200  # 1회전당 스텝 수
+      microsteps: 16    # 마이크로스텝 설정
+  
+  # PWM 주파수 (Hz)
+  pwm_frequency: 1000
+
+# 로깅 설정
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+# 기타 설정
+general:
+  # 데이터 저장 디렉토리
+  data_dir: "data"
+  
+  # 시뮬레이션 모드 (GPIO 없이 테스트)
+  simulation_mode: false
