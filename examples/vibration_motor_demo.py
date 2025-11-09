@@ -33,7 +33,7 @@ def single_motor_example():
         motor = VibrationMotor(
             pin=26,  # GPIO 26번 핀 (L298N IN1)
             pwm_frequency=1000,
-            simulation_mode=True,  # 테스트용 시뮬레이션 모드
+            simulation_mode=False,  # 실제 하드웨어 모드
         )
 
         print("✓ 진동모터 초기화 완료")
@@ -143,7 +143,7 @@ def multi_motor_example():
         controller = VibrationMotorController(
             motor_pins=motor_pins,
             pwm_frequency=1000,
-            simulation_mode=True,  # 테스트용 시뮬레이션 모드
+            simulation_mode=False,  # 실제 하드웨어 모드
         )
 
         print("✓ L298N 모터드라이버 (4핀) 컨트롤러 초기화 완료")
@@ -247,7 +247,7 @@ def haptic_feedback_example():
     controller = None
     try:
         controller = VibrationMotorController(
-            motor_pins=motor_pins, simulation_mode=True
+            motor_pins=motor_pins, simulation_mode=False
         )
 
         print("✓ 햅틱 피드백 시스템 초기화 완료")
