@@ -48,28 +48,19 @@ hand_tracking:
 
 # 모터 제어 설정
 motors:
-  # DC 모터 설정 (L298N 드라이버 예시)
-  dc_motors:
-    motor1:
-      enable_pin: 18  # PWM 핀 (GPIO 18)
-      in1_pin: 23     # 방향 제어 핀 1 (GPIO 23)
-      in2_pin: 24     # 방향 제어 핀 2 (GPIO 24)
-      type: "l298n"
+  # 진동모터 설정
+  vibration_motors:
+    hand_left:
+      pin: 18  # GPIO 18
     
-    motor2:
-      enable_pin: 12  # PWM 핀 (GPIO 12)
-      in1_pin: 5      # 방향 제어 핀 1 (GPIO 5)
-      in2_pin: 6      # 방향 제어 핀 2 (GPIO 6)
-      type: "l298n"
-  
-  # 스테퍼 모터 설정 (DRV8825 드라이버 예시)
-  stepper_motors:
-    stepper1:
-      step_pin: 16      # STEP 신호 핀 (GPIO 16)
-      dir_pin: 20       # DIR 신호 핀 (GPIO 20)
-      enable_pin: 21    # ENABLE 핀 (GPIO 21)
-      steps_per_revolution: 200  # 1회전당 스텝 수
-      microsteps: 16    # 마이크로스텝 설정
+    hand_right:
+      pin: 23  # GPIO 23
+    
+    # 추가 진동모터 (필요시)
+    # feedback_1:
+    #   pin: 24
+    # feedback_2:
+    #   pin: 25
   
   # PWM 주파수 (Hz)
   pwm_frequency: 1000

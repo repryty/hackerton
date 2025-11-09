@@ -4,6 +4,19 @@
 
 from .stereo_calibration import StereoCalibration
 from .hand_tracker_3d import HandTracker3D
-from .motor_controller import MotorController
+from .motor_controller import MotorController, StepperMotorController
+from .vibration_motor import (
+    VibrationMotor,
+    VibrationMotorController,
+    VIBRATION_PATTERNS,
+)
 
-__all__ = ["StereoCalibration", "HandTracker3D", "MotorController"]
+__all__ = [
+    "StereoCalibration",
+    "HandTracker3D",
+    "MotorController",
+    "StepperMotorController",
+    "VibrationMotor",
+    "VibrationMotorController",
+    "VIBRATION_PATTERNS",
+]
