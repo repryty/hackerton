@@ -63,7 +63,7 @@ cd hackerton
 pip install -e .
 
 # 또는 개별 패키지 설치
-pip install opencv-python mediapipe numpy picamera2 RPi.GPIO
+pip install opencv-python mediapipe numpy picamera2 RPi.GPIO pyyaml
 ```
 
 ## 🔄 CI/CD
@@ -90,6 +90,64 @@ docker run -d \
 ```
 
 ## 🚀 모듈 사용법
+
+### 메인 프로그램: 가상 그래프 햅틱 피드백
+
+메인 프로그램은 스테레오 카메라로 손을 추적하고, 검지손가락이 테이블에 닿아 가상 그래프에 접촉하면 진동모터를 작동시킵니다.
+
+#### 실행 방법
+
+```bash
+# 먼저 캘리브레이션 수행 (한 번만 실행)
+python examples/calibrate_cameras.py
+
+# 메인 프로그램 실행
+python main.py
+```
+
+#### 작동 원리
+
+1. **손 추적**: 스테레오 카메라로 손의 3D 좌표를 실시간 추적
+2. **테이블 감지**: 검지손가락 끝의 높이(y 좌표)가 설정된 테이블 높이 이하인지 확인
+3. **그래프 충돌 감지**: 검지손가락이 가상 그래프 영역에 들어오는지 확인
+4. **햅틱 피드백**: 조건이 만족되면 GPIO 진동모터 작동
+
+#### 설정 사항
+
+`main.py`에서 다음 값들을 조정할 수 있습니다:
+
+```python
+# 테이블 높이 임계값 (mm)
+TABLE_HEIGHT_THRESHOLD = 200.0  # 이 값보다 크면 테이블에 닿은 것으로 판단
+
+# 가상 그래프 정의 (x, y, z 좌표)
+graph_points = [
+    (-100, TABLE_HEIGHT_THRESHOLD, 500),  # 시작점
+    (-50, TABLE_HEIGHT_THRESHOLD, 450),
+    (0, TABLE_HEIGHT_THRESHOLD, 400),
+    (50, TABLE_HEIGHT_THRESHOLD, 450),
+    (100, TABLE_HEIGHT_THRESHOLD, 500),   # 끝점
+]
+
+# 그래프 두께 (mm)
+virtual_graph = VirtualGraph(graph_points, thickness=30.0)
+```
+
+#### 화면 정보
+
+프로그램 실행 시 화면에 다음 정보가 표시됩니다:
+- FPS: 프레임 속도
+- Table Height: 설정된 테이블 높이
+- Motor: 진동모터 상태 (On/Off)
+- 각 손의 검지손가락 위치
+- 테이블 접촉 상태
+- 그래프까지의 거리
+
+#### 종료
+
+`ESC` 키를 눌러 프로그램을 종료할 수 있습니다.
+
+---
 
 ### 1. 스테레오 카메라 캘리브레이션
 
