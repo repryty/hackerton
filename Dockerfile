@@ -10,14 +10,11 @@ RUN apt-get update && apt-get install -y \
     # OpenCV 의존성
     libopencv-dev \
     libatlas-base-dev \
-    libjasper-dev \
-    libqtgui4 \
-    libqt4-test \
     libhdf5-dev \
     libharfbuzz0b \
-    libwebp7 \
-    libtiff6 \
-    libjpeg62-turbo \
+    libwebp-dev \
+    libtiff-dev \
+    libjpeg-dev \
     libopenjp2-7 \
     libavcodec-dev \
     libavformat-dev \
@@ -25,12 +22,14 @@ RUN apt-get update && apt-get install -y \
     libv4l-dev \
     libxvidcore-dev \
     libx264-dev \
+    # Qt5 (Qt4는 더 이상 지원되지 않음)
+    libqt5gui5 \
+    libqt5test5 \
     # 라즈베리파이 카메라 지원
-    libraspberrypi-bin \
-    libraspberrypi-dev \
     python3-picamera2 \
     # GPIO 지원
     python3-rpi.gpio \
+    python3-lgpio \
     # 기타 유틸리티
     v4l-utils \
     && rm -rf /var/lib/apt/lists/*
