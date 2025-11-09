@@ -33,7 +33,7 @@ stereo_calibration:
 # Mediapipe 손 추적 설정
 hand_tracking:
   # 최대 손 개수
-  max_num_hands: 2
+  max_num_hands: 1  # 단일 손 추적
   
   # 감지 신뢰도 임계값
   min_detection_confidence: 0.5
@@ -46,24 +46,48 @@ hand_tracking:
     show_landmarks: true
     show_fps: true
 
-# 모터 제어 설정
+# 진동모터 설정 (L298N 모터드라이버 - 2개 DC 모터)
+# L298N 핀 배치: IN1(GPIO 26), IN2(GPIO 19), IN3(GPIO 13), IN4(GPIO 6)
 motors:
-  # 진동모터 설정
   vibration_motors:
-    hand_left:
-      pin: 18  # GPIO 18
+    motor_1:
+      pin: 26  # L298N IN1 (모터 1 제어)
     
-    hand_right:
-      pin: 23  # GPIO 23
-    
-    # 추가 진동모터 (필요시)
-    # feedback_1:
-    #   pin: 24
-    # feedback_2:
-    #   pin: 25
+    motor_2:
+      pin: 13  # L298N IN3 (모터 2 제어)
   
-  # PWM 주파수 (Hz)
   pwm_frequency: 1000
+
+# GPIO 버튼 설정 (스탠드얼론 제어)
+buttons:
+  record_pin: 17   # 음성 녹음 버튼 (GPIO 17) - 5초 녹음 후 Gemini 처리
+
+# Gemini API 설정
+gemini:
+  api_key: null  # 환경변수 GEMINI_API_KEY 사용 권장
+  model: "gemini-pro"
+
+# 좌표계 설정
+coordinate_system:
+  x_range:
+    min: -300
+    max: 300
+  z_range:
+    min: 200
+    max: 800
+  table_height: 200
+  adjustment_step:
+    x: 50
+    z: 50
+
+# 그래프 설정
+graphs:
+  default_thickness: 30.0
+  default_z_offset: 400.0
+  num_points: 100
+  color:
+    saturation: 0.8
+    value: 0.9
 
 # 로깅 설정
 logging:

@@ -25,18 +25,19 @@ def single_motor_example():
     print("=" * 60)
     print()
 
-    # VibrationMotor 초기화 (시뮬레이션 모드)
-    # 실제 라즈베리파이에서 실행 시 simulation_mode=False로 설정
-    motor = VibrationMotor(
-        pin=18,  # GPIO 18번 핀
-        pwm_frequency=1000,
-        simulation_mode=True,  # 테스트용 시뮬레이션 모드
-    )
-
-    print("✓ 진동모터 초기화 완료")
-    print()
-
+    motor = None
     try:
+        # VibrationMotor 초기화 (시뮬레이션 모드)
+        # 실제 라즈베리파이에서 실행 시 simulation_mode=False로 설정
+        # L298N 모터드라이버 사용: IN1 (GPIO 26)
+        motor = VibrationMotor(
+            pin=26,  # GPIO 26번 핀 (L298N IN1)
+            pwm_frequency=1000,
+            simulation_mode=True,  # 테스트용 시뮬레이션 모드
+        )
+
+        print("✓ 진동모터 초기화 완료")
+        print()
         # 예제 1: 기본 진동
         print("예제 1: 100% 강도로 1초 진동")
         motor.start(100)
@@ -107,10 +108,15 @@ def single_motor_example():
         motor.vibrate_pattern(custom_pattern)
         print()
 
+    except Exception as e:
+        print(f"⚠️  예제 실행 중 오류 발생: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         # 정리
-        motor.cleanup()
-        print("✓ 진동모터 종료")
+        if motor:
+            motor.cleanup()
+            print("✓ 진동모터 종료")
 
 
 def multi_motor_example():
@@ -121,23 +127,30 @@ def multi_motor_example():
     print("=" * 60)
     print()
 
-    # 모터 핀 설정
-    motor_pins = {"left": 18, "right": 23, "top": 24, "bottom": 25}
+    # 모터 핀 설정 (L298N 모터드라이버)
+    # 모터 1: IN1 (GPIO 26), IN2 (GPIO 19)
+    # 모터 2: IN3 (GPIO 13), IN4 (GPIO 6)
+    motor_pins = {
+        "motor_1_in1": 26,  # L298N IN1
+        "motor_1_in2": 19,  # L298N IN2
+        "motor_2_in3": 13,  # L298N IN3
+        "motor_2_in4": 6,   # L298N IN4
+    }
 
-    # VibrationMotorController 초기화
-    controller = VibrationMotorController(
-        motor_pins=motor_pins,
-        pwm_frequency=1000,
-        simulation_mode=True,  # 테스트용 시뮬레이션 모드
-    )
-
-    print("✓ 4개 진동모터 컨트롤러 초기화 완료")
-    print()
-
+    controller = None
     try:
+        # VibrationMotorController 초기화
+        controller = VibrationMotorController(
+            motor_pins=motor_pins,
+            pwm_frequency=1000,
+            simulation_mode=True,  # 테스트용 시뮬레이션 모드
+        )
+
+        print("✓ L298N 모터드라이버 (4핀) 컨트롤러 초기화 완료")
+        print()
         # 예제 1: 개별 모터 제어
         print("예제 1: 개별 모터 순차 진동")
-        for motor_name in ["left", "right", "top", "bottom"]:
+        for motor_name in ["motor_1_in1", "motor_1_in2", "motor_2_in3", "motor_2_in4"]:
             print(f"  {motor_name} 모터 진동")
             controller.pulse(motor_name, 100, 0.3)
             time.sleep(0.2)
@@ -154,10 +167,10 @@ def multi_motor_example():
         # 예제 3: 순차 시퀀스
         print("예제 3: 순차 시퀀스 재생")
         sequence = [
-            {"motor": "left", "intensity": 100, "duration": 0.2},
-            {"motor": "top", "intensity": 100, "duration": 0.2},
-            {"motor": "right", "intensity": 100, "duration": 0.2},
-            {"motor": "bottom", "intensity": 100, "duration": 0.2},
+            {"motor": "motor_1_in1", "intensity": 100, "duration": 0.2},
+            {"motor": "motor_1_in2", "intensity": 100, "duration": 0.2},
+            {"motor": "motor_2_in3", "intensity": 100, "duration": 0.2},
+            {"motor": "motor_2_in4", "intensity": 100, "duration": 0.2},
         ]
         controller.pulse_sequence(sequence)
         time.sleep(0.5)
@@ -169,12 +182,12 @@ def multi_motor_example():
         time.sleep(0.5)
         print()
 
-        # 예제 5: 방향 표시 (좌우)
-        print("예제 5: 방향 표시 - 왼쪽에서 오른쪽으로")
+        # 예제 5: 방향 표시 (모터 1 → 모터 2)
+        print("예제 5: 방향 표시 - 모터 1에서 모터 2로")
         for i in range(3):
-            controller.pulse("left", 100, 0.15)
+            controller.pulse("motor_1_in1", 100, 0.15)
             time.sleep(0.1)
-            controller.pulse("right", 100, 0.15)
+            controller.pulse("motor_2_in3", 100, 0.15)
             time.sleep(0.3)
         print()
 
@@ -205,11 +218,16 @@ def multi_motor_example():
                 f"  {motor_name}: 강도={state['intensity']}%, 동작중={state['is_running']}"
             )
 
+    except Exception as e:
+        print(f"⚠️  예제 실행 중 오류 발생: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         # 정리
-        controller.cleanup()
-        print()
-        print("✓ 진동모터 컨트롤러 종료")
+        if controller:
+            controller.cleanup()
+            print()
+            print("✓ 진동모터 컨트롤러 종료")
 
 
 def haptic_feedback_example():
@@ -220,17 +238,23 @@ def haptic_feedback_example():
     print("=" * 60)
     print()
 
-    motor_pins = {"hand_left": 18, "hand_right": 23}
+    # L298N 모터드라이버: 모터 1과 모터 2의 IN1 핀 사용
+    motor_pins = {
+        "motor_1": 26,  # L298N IN1 (모터 1)
+        "motor_2": 13   # L298N IN3 (모터 2)
+    }
 
-    controller = VibrationMotorController(motor_pins=motor_pins, simulation_mode=True)
-
-    print("✓ 햅틱 피드백 시스템 초기화 완료")
-    print()
-
+    controller = None
     try:
+        controller = VibrationMotorController(
+            motor_pins=motor_pins, simulation_mode=True
+        )
+
+        print("✓ 햅틱 피드백 시스템 초기화 완료")
+        print()
         # 시나리오 1: 버튼 클릭 피드백
         print("시나리오 1: 버튼 클릭 피드백")
-        controller.pulse("hand_right", 80, 0.05)
+        controller.pulse("motor_2", 80, 0.05)
         time.sleep(0.5)
         print()
 
@@ -258,17 +282,17 @@ def haptic_feedback_example():
         time.sleep(0.5)
         print()
 
-        # 시나리오 5: 좌우 방향 안내
-        print("시나리오 5: 좌우 방향 안내")
-        print("  왼쪽으로!")
+        # 시나리오 5: 모터 1/2 방향 안내
+        print("시나리오 5: 모터 방향 안내")
+        print("  모터 1!")
         for _ in range(3):
-            controller.pulse("hand_left", 100, 0.15)
+            controller.pulse("motor_1", 100, 0.15)
             time.sleep(0.15)
         time.sleep(0.5)
 
-        print("  오른쪽으로!")
+        print("  모터 2!")
         for _ in range(3):
-            controller.pulse("hand_right", 100, 0.15)
+            controller.pulse("motor_2", 100, 0.15)
             time.sleep(0.15)
         time.sleep(0.5)
         print()
@@ -279,9 +303,14 @@ def haptic_feedback_example():
         time.sleep(0.5)
         print()
 
+    except Exception as e:
+        print(f"⚠️  예제 실행 중 오류 발생: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
-        controller.cleanup()
-        print("✓ 햅틱 피드백 시스템 종료")
+        if controller:
+            controller.cleanup()
+            print("✓ 햅틱 피드백 시스템 종료")
 
 
 def main():
