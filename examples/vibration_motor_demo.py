@@ -18,6 +18,64 @@ from modules.vibration_motor import (
 )
 
 
+def detect_raspberry_pi():
+    """Raspberry Pi 환경인지 확인 (디버그 정보 포함)"""
+    print("[DEBUG] Raspberry Pi 환경 감지 중...")
+    
+    # 방법 1: /proc/cpuinfo 확인
+    try:
+        with open('/proc/cpuinfo', 'r') as f:
+            cpuinfo = f.read()
+            print(f"[DEBUG] /proc/cpuinfo 읽기 성공")
+            # BCM, Raspberry Pi 문자열 확인
+            if 'BCM' in cpuinfo or 'Raspberry Pi' in cpuinfo or 'BCM2' in cpuinfo:
+                print(f"[DEBUG] ✓ /proc/cpuinfo에서 Raspberry Pi 감지됨")
+                return True
+            else:
+                print(f"[DEBUG] /proc/cpuinfo 일부 내용: {cpuinfo[:200]}")
+    except FileNotFoundError:
+        print("[DEBUG] ⚠️  /proc/cpuinfo 파일을 찾을 수 없음")
+    except PermissionError:
+        print("[DEBUG] ⚠️  /proc/cpuinfo 읽기 권한 없음")
+    except Exception as e:
+        print(f"[DEBUG] ⚠️  /proc/cpuinfo 읽기 오류: {e}")
+    
+    # 방법 2: /proc/device-tree/model 확인
+    try:
+        with open('/proc/device-tree/model', 'r') as f:
+            model = f.read()
+            print(f"[DEBUG] /proc/device-tree/model 내용: {model.strip()}")
+            if 'Raspberry Pi' in model:
+                print(f"[DEBUG] ✓ /proc/device-tree/model에서 Raspberry Pi 감지됨")
+                return True
+    except FileNotFoundError:
+        print("[DEBUG] ⚠️  /proc/device-tree/model 파일을 찾을 수 없음")
+    except PermissionError:
+        print("[DEBUG] ⚠️  /proc/device-tree/model 읽기 권한 없음")
+    except Exception as e:
+        print(f"[DEBUG] ⚠️  /proc/device-tree/model 읽기 오류: {e}")
+    
+    # 방법 3: GPIO 라이브러리로 확인
+    try:
+        import RPi.GPIO as GPIO
+        print("[DEBUG] ✓ RPi.GPIO 라이브러리 import 성공")
+        # GPIO 초기화 시도
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setwarnings(False)
+        print("[DEBUG] ✓ GPIO 초기화 성공 - Raspberry Pi 환경임")
+        GPIO.cleanup()
+        return True
+    except ImportError:
+        print("[DEBUG] ⚠️  RPi.GPIO 라이브러리를 찾을 수 없음")
+    except RuntimeError as e:
+        print(f"[DEBUG] ⚠️  GPIO 초기화 실패: {e}")
+    except Exception as e:
+        print(f"[DEBUG] ⚠️  GPIO 확인 오류: {e}")
+    
+    print("[DEBUG] ✗ Raspberry Pi 환경이 아닌 것으로 판단됨")
+    return False
+
+
 def single_motor_example():
     """단일 진동모터 제어 예제"""
     print("=" * 60)
@@ -26,14 +84,22 @@ def single_motor_example():
     print()
 
     motor = None
+    # Raspberry Pi 환경 감지
+    is_raspberry_pi = detect_raspberry_pi()
+    simulation_mode = not is_raspberry_pi
+    
+    if simulation_mode:
+        print("⚠️  Raspberry Pi 환경이 아닙니다. 시뮬레이션 모드로 실행합니다.")
+    else:
+        print("✓ Raspberry Pi 환경 감지됨. 실제 하드웨어 모드로 실행합니다.")
+    print()
+    
     try:
-        # VibrationMotor 초기화 (시뮬레이션 모드)
-        # 실제 라즈베리파이에서 실행 시 simulation_mode=False로 설정
-        # L298N 모터드라이버 사용: IN1 (GPIO 26)
+        # VibrationMotor 초기화
         motor = VibrationMotor(
             pin=26,  # GPIO 26번 핀 (L298N IN1)
             pwm_frequency=1000,
-            simulation_mode=False,  # 실제 하드웨어 모드
+            simulation_mode=simulation_mode,
         )
 
         print("✓ 진동모터 초기화 완료")
@@ -128,8 +194,6 @@ def multi_motor_example():
     print()
 
     # 모터 핀 설정 (L298N 모터드라이버)
-    # 모터 1: IN1 (GPIO 26), IN2 (GPIO 19)
-    # 모터 2: IN3 (GPIO 13), IN4 (GPIO 6)
     motor_pins = {
         "motor_1_in1": 26,  # L298N IN1
         "motor_1_in2": 19,  # L298N IN2
@@ -138,12 +202,22 @@ def multi_motor_example():
     }
 
     controller = None
+    # Raspberry Pi 환경 감지
+    is_raspberry_pi = detect_raspberry_pi()
+    simulation_mode = not is_raspberry_pi
+    
+    if simulation_mode:
+        print("⚠️  Raspberry Pi 환경이 아닙니다. 시뮬레이션 모드로 실행합니다.")
+    else:
+        print("✓ Raspberry Pi 환경 감지됨. 실제 하드웨어 모드로 실행합니다.")
+    print()
+    
     try:
         # VibrationMotorController 초기화
         controller = VibrationMotorController(
             motor_pins=motor_pins,
             pwm_frequency=1000,
-            simulation_mode=False,  # 실제 하드웨어 모드
+            simulation_mode=simulation_mode,
         )
 
         print("✓ L298N 모터드라이버 (4핀) 컨트롤러 초기화 완료")
@@ -238,16 +312,26 @@ def haptic_feedback_example():
     print("=" * 60)
     print()
 
-    # L298N 모터드라이버: 모터 1과 모터 2의 IN1 핀 사용
     motor_pins = {
         "motor_1": 26,  # L298N IN1 (모터 1)
         "motor_2": 13   # L298N IN3 (모터 2)
     }
 
     controller = None
+    # Raspberry Pi 환경 감지
+    is_raspberry_pi = detect_raspberry_pi()
+    simulation_mode = not is_raspberry_pi
+    
+    if simulation_mode:
+        print("⚠️  Raspberry Pi 환경이 아닙니다. 시뮬레이션 모드로 실행합니다.")
+    else:
+        print("✓ Raspberry Pi 환경 감지됨. 실제 하드웨어 모드로 실행합니다.")
+    print()
+    
     try:
         controller = VibrationMotorController(
-            motor_pins=motor_pins, simulation_mode=False
+            motor_pins=motor_pins, 
+            simulation_mode=simulation_mode
         )
 
         print("✓ 햅틱 피드백 시스템 초기화 완료")
@@ -320,8 +404,14 @@ def main():
     print("진동모터 제어 종합 예제")
     print("=" * 60)
     print()
-    print("주의: 이 예제는 시뮬레이션 모드로 동작합니다.")
-    print("실제 하드웨어에서 실행하려면 코드에서 simulation_mode=False로 설정하세요.")
+    
+    is_raspberry_pi = detect_raspberry_pi()
+    if is_raspberry_pi:
+        print("✓ Raspberry Pi 환경에서 실행 중입니다.")
+        print("실제 하드웨어 모드로 GPIO를 제어합니다.")
+    else:
+        print("⚠️  Raspberry Pi가 아닌 환경에서 실행 중입니다.")
+        print("시뮬레이션 모드로 동작합니다. (실제 GPIO 제어 없음)")
     print()
 
     # 단일 모터 예제
@@ -353,5 +443,4 @@ if __name__ == "__main__":
         print()
         print(f"에러 발생: {e}")
         import traceback
-
         traceback.print_exc()
