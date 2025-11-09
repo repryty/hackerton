@@ -10,12 +10,12 @@ from typing import Optional, Dict
 import logging
 
 try:
-    import RPi.GPIO as GPIO
+    import lgpio
 
     GPIO_AVAILABLE = True
 except (ImportError, RuntimeError):
     GPIO_AVAILABLE = False
-    logging.warning("RPi.GPIO를 사용할 수 없습니다. 시뮬레이션 모드로 동작합니다.")
+    logging.warning("lgpio를 사용할 수 없습니다. 시뮬레이션 모드로 동작합니다.")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,6 +54,9 @@ class MotorController:
         self.pwm_frequency = pwm_frequency
         self.simulation_mode = simulation_mode or not GPIO_AVAILABLE
 
+        # lgpio 핸들
+        self.handle = None
+        
         # 모터별 PWM 객체 저장
         self.pwm_objects: Dict[str, Optional[object]] = {}
 
@@ -70,34 +73,42 @@ class MotorController:
 
     def _setup_gpio(self):
         """GPIO 핀을 초기화합니다."""
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setwarnings(False)
+        try:
+            # lgpio 핸들 열기 (gpiochip4는 라즈베리파이 5용)
+            self.handle = lgpio.gpiochip_open(4)
 
-        for motor_name, config in self.motor_configs.items():
-            enable_pin = config["enable_pin"]
-            in1_pin = config["in1_pin"]
-            in2_pin = config["in2_pin"]
+            for motor_name, config in self.motor_configs.items():
+                enable_pin = config["enable_pin"]
+                in1_pin = config["in1_pin"]
+                in2_pin = config["in2_pin"]
 
-            # 핀 모드 설정
-            GPIO.setup(enable_pin, GPIO.OUT)
-            GPIO.setup(in1_pin, GPIO.OUT)
-            GPIO.setup(in2_pin, GPIO.OUT)
+                # 핀을 출력으로 설정
+                lgpio.gpio_claim_output(self.handle, enable_pin)
+                lgpio.gpio_claim_output(self.handle, in1_pin)
+                lgpio.gpio_claim_output(self.handle, in2_pin)
 
-            # PWM 설정
-            pwm = GPIO.PWM(enable_pin, self.pwm_frequency)
-            pwm.start(0)
-            self.pwm_objects[motor_name] = pwm
+                # PWM 설정 (초기 duty cycle 0%)
+                lgpio.tx_pwm(self.handle, enable_pin, self.pwm_frequency, 0)
+                
+                # 방향 핀 초기화
+                lgpio.gpio_write(self.handle, in1_pin, 0)
+                lgpio.gpio_write(self.handle, in2_pin, 0)
+                
+                self.pwm_objects[motor_name] = enable_pin  # PWM 핀 번호 저장
 
-            # 초기 상태
-            self.motor_states[motor_name] = {
-                "speed": 0,
-                "direction": "stop",
-                "enabled": True,
-            }
+                # 초기 상태
+                self.motor_states[motor_name] = {
+                    "speed": 0,
+                    "direction": "stop",
+                    "enabled": True,
+                }
 
-            logger.info(
-                f"모터 '{motor_name}' GPIO 설정 완료 (Enable: {enable_pin}, IN1: {in1_pin}, IN2: {in2_pin})"
-            )
+                logger.info(
+                    f"모터 '{motor_name}' GPIO 설정 완료 (Enable: {enable_pin}, IN1: {in1_pin}, IN2: {in2_pin})"
+                )
+        except Exception as e:
+            logger.error(f"GPIO 초기화 실패: {e}")
+            raise
 
     def _setup_simulation(self):
         """시뮬레이션 모드를 초기화합니다."""
@@ -140,20 +151,20 @@ class MotorController:
         if not self.simulation_mode:
             # 방향 설정
             if direction == "forward":
-                GPIO.output(config["in1_pin"], GPIO.HIGH)
-                GPIO.output(config["in2_pin"], GPIO.LOW)
+                lgpio.gpio_write(self.handle, config["in1_pin"], 1)
+                lgpio.gpio_write(self.handle, config["in2_pin"], 0)
             elif direction == "backward":
-                GPIO.output(config["in1_pin"], GPIO.LOW)
-                GPIO.output(config["in2_pin"], GPIO.HIGH)
+                lgpio.gpio_write(self.handle, config["in1_pin"], 0)
+                lgpio.gpio_write(self.handle, config["in2_pin"], 1)
             else:  # stop
-                GPIO.output(config["in1_pin"], GPIO.LOW)
-                GPIO.output(config["in2_pin"], GPIO.LOW)
+                lgpio.gpio_write(self.handle, config["in1_pin"], 0)
+                lgpio.gpio_write(self.handle, config["in2_pin"], 0)
                 speed = 0
 
             # 속도 설정 (PWM duty cycle)
-            pwm = self.pwm_objects[motor_name]
-            if pwm:
-                pwm.ChangeDutyCycle(speed)
+            enable_pin = self.pwm_objects[motor_name]
+            if enable_pin:
+                lgpio.tx_pwm(self.handle, enable_pin, self.pwm_frequency, speed)
 
         # 상태 업데이트
         self.motor_states[motor_name]["speed"] = speed
@@ -343,15 +354,27 @@ class MotorController:
         # 모든 모터 정지
         self.stop_all_motors()
 
-        if not self.simulation_mode:
-            # PWM 정지
-            for pwm in self.pwm_objects.values():
-                if pwm:
-                    pwm.stop()
-
-            # GPIO 정리
-            GPIO.cleanup()
-            logger.info("GPIO 정리 완료")
+        if not self.simulation_mode and self.handle is not None:
+            try:
+                # 모든 핀에 대해 PWM 중지 및 정리
+                for motor_name, config in self.motor_configs.items():
+                    enable_pin = config["enable_pin"]
+                    in1_pin = config["in1_pin"]
+                    in2_pin = config["in2_pin"]
+                    
+                    # PWM 중지
+                    lgpio.tx_pwm(self.handle, enable_pin, self.pwm_frequency, 0)
+                    
+                    # 핀 해제
+                    lgpio.gpio_free(self.handle, enable_pin)
+                    lgpio.gpio_free(self.handle, in1_pin)
+                    lgpio.gpio_free(self.handle, in2_pin)
+                
+                # 핸들 닫기
+                lgpio.gpiochip_close(self.handle)
+                logger.info("GPIO 정리 완료")
+            except Exception as e:
+                logger.error(f"GPIO 정리 중 오류: {e}")
 
         logger.info("MotorController 종료 완료")
 
@@ -396,6 +419,7 @@ class StepperMotorController:
         self.microsteps = microsteps
         self.simulation_mode = simulation_mode or not GPIO_AVAILABLE
 
+        self.handle = None  # lgpio 핸들
         self.current_position = 0  # 현재 위치 (스텝)
         self.enabled = True
 
@@ -408,13 +432,20 @@ class StepperMotorController:
 
     def _setup_gpio(self):
         """GPIO 핀을 초기화합니다."""
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.step_pin, GPIO.OUT)
-        GPIO.setup(self.dir_pin, GPIO.OUT)
+        try:
+            # lgpio 핸들 열기 (gpiochip4는 라즈베리파이 5용)
+            self.handle = lgpio.gpiochip_open(4)
+            
+            # 핀을 출력으로 설정
+            lgpio.gpio_claim_output(self.handle, self.step_pin)
+            lgpio.gpio_claim_output(self.handle, self.dir_pin)
 
-        if self.enable_pin:
-            GPIO.setup(self.enable_pin, GPIO.OUT)
-            GPIO.output(self.enable_pin, GPIO.LOW)  # 활성화
+            if self.enable_pin:
+                lgpio.gpio_claim_output(self.handle, self.enable_pin)
+                lgpio.gpio_write(self.handle, self.enable_pin, 0)  # 활성화
+        except Exception as e:
+            logger.error(f"StepperMotor GPIO 초기화 실패: {e}")
+            raise
 
     def move_steps(
         self, steps: int, speed: float = 1.0, direction: Optional[str] = None
@@ -436,16 +467,16 @@ class StepperMotorController:
 
         # 방향 설정
         if not self.simulation_mode:
-            GPIO.output(self.dir_pin, GPIO.HIGH if clockwise else GPIO.LOW)
+            lgpio.gpio_write(self.handle, self.dir_pin, 1 if clockwise else 0)
 
         # 스텝 신호 생성
         delay = (1.0 / (self.steps_per_revolution * self.microsteps)) / speed
 
         for i in range(actual_steps):
             if not self.simulation_mode:
-                GPIO.output(self.step_pin, GPIO.HIGH)
+                lgpio.gpio_write(self.handle, self.step_pin, 1)
                 time.sleep(delay / 2)
-                GPIO.output(self.step_pin, GPIO.LOW)
+                lgpio.gpio_write(self.handle, self.step_pin, 0)
                 time.sleep(delay / 2)
             else:
                 time.sleep(delay)
@@ -491,21 +522,28 @@ class StepperMotorController:
     def enable(self):
         """모터를 활성화합니다."""
         if not self.simulation_mode and self.enable_pin:
-            GPIO.output(self.enable_pin, GPIO.LOW)
+            lgpio.gpio_write(self.handle, self.enable_pin, 0)
         self.enabled = True
         logger.info("스테퍼 모터 활성화")
 
     def disable(self):
         """모터를 비활성화합니다."""
         if not self.simulation_mode and self.enable_pin:
-            GPIO.output(self.enable_pin, GPIO.HIGH)
+            lgpio.gpio_write(self.handle, self.enable_pin, 1)
         self.enabled = False
         logger.info("스테퍼 모터 비활성화")
 
     def cleanup(self):
         """리소스를 정리합니다."""
-        if not self.simulation_mode:
-            GPIO.cleanup([self.step_pin, self.dir_pin])
-            if self.enable_pin:
-                GPIO.cleanup(self.enable_pin)
+        if not self.simulation_mode and self.handle is not None:
+            try:
+                lgpio.gpio_free(self.handle, self.step_pin)
+                lgpio.gpio_free(self.handle, self.dir_pin)
+                if self.enable_pin:
+                    lgpio.gpio_free(self.handle, self.enable_pin)
+                
+                lgpio.gpiochip_close(self.handle)
+                logger.info("스테퍼 모터 GPIO 정리 완료")
+            except Exception as e:
+                logger.error(f"스테퍼 모터 GPIO 정리 중 오류: {e}")
         logger.info("StepperMotorController 종료")

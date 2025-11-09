@@ -18,7 +18,13 @@ from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 import cv2
 import numpy as np
-import RPi.GPIO as GPIO
+
+try:
+    import lgpio
+    GPIO_AVAILABLE = True
+except (ImportError, RuntimeError):
+    GPIO_AVAILABLE = False
+    logging.warning("lgpio를 사용할 수 없습니다.")
 
 # 프로젝트 루트를 Python 경로에 추가
 sys.path.append(str(Path(__file__).parent))
@@ -597,20 +603,30 @@ class ButtonController:
         self.recording = False
         self.record_start_time = 0
         
+        self.handle = None
         # GPIO 초기화
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.button_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        if GPIO_AVAILABLE:
+            try:
+                self.handle = lgpio.gpiochip_open(4)  # 라즈베리파이 5
+                lgpio.gpio_claim_input(self.handle, self.button_pin, lgpio.SET_PULL_UP)
+                logger.info(f"✓ GPIO 버튼 초기화: RecordButton={button_pin}")
+            except Exception as e:
+                logger.error(f"GPIO 버튼 초기화 실패: {e}")
+                self.handle = None
+        else:
+            logger.warning("GPIO를 사용할 수 없습니다. 버튼 기능 비활성화")
         
         # 디바운싱
         self.last_press = 0
         self.debounce_time = 0.3
-        
-        logger.info(f"✓ GPIO 버튼 초기화: RecordButton={button_pin}")
     
     def is_button_pressed(self) -> bool:
         """버튼 눌림 감지"""
+        if self.handle is None:
+            return False
+            
         current_time = time.time()
-        if GPIO.input(self.button_pin) == GPIO.LOW:
+        if lgpio.gpio_read(self.handle, self.button_pin) == 0:  # LOW = 눌림
             if current_time - self.last_press > self.debounce_time:
                 self.last_press = current_time
                 return True
@@ -618,7 +634,13 @@ class ButtonController:
     
     def cleanup(self):
         """GPIO 정리"""
-        GPIO.cleanup([self.button_pin])
+        if self.handle is not None:
+            try:
+                lgpio.gpio_free(self.handle, self.button_pin)
+                lgpio.gpiochip_close(self.handle)
+                logger.info("버튼 GPIO 정리 완료")
+            except Exception as e:
+                logger.error(f"버튼 GPIO 정리 중 오류: {e}")
 
 
 def main():

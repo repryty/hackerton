@@ -55,20 +55,17 @@ def detect_raspberry_pi():
     except Exception as e:
         print(f"[DEBUG] ⚠️  /proc/device-tree/model 읽기 오류: {e}")
     
-    # 방법 3: GPIO 라이브러리로 확인
+    # 방법 3: lgpio 라이브러리로 확인
     try:
-        import RPi.GPIO as GPIO
-        print("[DEBUG] ✓ RPi.GPIO 라이브러리 import 성공")
-        # GPIO 초기화 시도
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setwarnings(False)
-        print("[DEBUG] ✓ GPIO 초기화 성공 - Raspberry Pi 환경임")
-        GPIO.cleanup()
+        import lgpio
+        print("[DEBUG] ✓ lgpio 라이브러리 import 성공")
+        # GPIO 핸들 열기 시도
+        handle = lgpio.gpiochip_open(4)
+        print("[DEBUG] ✓ gpiochip4 열기 성공 - Raspberry Pi 5 환경임")
+        lgpio.gpiochip_close(handle)
         return True
     except ImportError:
-        print("[DEBUG] ⚠️  RPi.GPIO 라이브러리를 찾을 수 없음")
-    except RuntimeError as e:
-        print(f"[DEBUG] ⚠️  GPIO 초기화 실패: {e}")
+        print("[DEBUG] ⚠️  lgpio 라이브러리를 찾을 수 없음")
     except Exception as e:
         print(f"[DEBUG] ⚠️  GPIO 확인 오류: {e}")
     

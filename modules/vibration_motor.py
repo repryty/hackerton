@@ -10,12 +10,12 @@ from typing import Dict, List
 import logging
 
 try:
-    import RPi.GPIO as GPIO
+    import lgpio
 
     GPIO_AVAILABLE = True
 except (ImportError, RuntimeError):
     GPIO_AVAILABLE = False
-    logging.warning("RPi.GPIO를 사용할 수 없습니다. 시뮬레이션 모드로 동작합니다.")
+    logging.warning("lgpio를 사용할 수 없습니다. 시뮬레이션 모드로 동작합니다.")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ class VibrationMotor:
         self.pwm_frequency = pwm_frequency
         self.simulation_mode = simulation_mode or not GPIO_AVAILABLE
 
-        self.pwm = None
+        self.handle = None  # lgpio 핸들
         self.current_intensity = 0  # 현재 진동 강도 (0-100%)
         self.is_running = False
 
@@ -55,15 +55,20 @@ class VibrationMotor:
 
     def _setup_gpio(self):
         """GPIO 핀을 초기화합니다."""
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setwarnings(False)
-        GPIO.setup(self.pin, GPIO.OUT)
-
-        # PWM 설정
-        self.pwm = GPIO.PWM(self.pin, self.pwm_frequency)
-        self.pwm.start(0)
-
-        logger.info(f"GPIO {self.pin} 초기화 완료")
+        try:
+            # lgpio 핸들 열기 (gpiochip4는 라즈베리파이 5용)
+            self.handle = lgpio.gpiochip_open(4)
+            
+            # 핀을 출력으로 설정
+            lgpio.gpio_claim_output(self.handle, self.pin)
+            
+            # PWM 설정 (주파수, duty cycle 0%)
+            lgpio.tx_pwm(self.handle, self.pin, self.pwm_frequency, 0)
+            
+            logger.info(f"GPIO {self.pin} 초기화 완료")
+        except Exception as e:
+            logger.error(f"GPIO 초기화 실패: {e}")
+            raise
 
     def set_intensity(self, intensity: float) -> bool:
         """
@@ -78,8 +83,9 @@ class VibrationMotor:
         # 강도 범위 제한
         intensity = max(0.0, min(100.0, intensity))
 
-        if not self.simulation_mode and self.pwm:
-            self.pwm.ChangeDutyCycle(intensity)
+        if not self.simulation_mode and self.handle is not None:
+            # lgpio에서 duty cycle 설정
+            lgpio.tx_pwm(self.handle, self.pin, self.pwm_frequency, intensity)
 
         self.current_intensity = intensity
         self.is_running = intensity > 0
@@ -207,10 +213,17 @@ class VibrationMotor:
 
         self.stop()
 
-        if not self.simulation_mode and self.pwm:
-            self.pwm.stop()
-            GPIO.cleanup(self.pin)
-            logger.info("GPIO 정리 완료")
+        if not self.simulation_mode and self.handle is not None:
+            try:
+                # PWM 중지
+                lgpio.tx_pwm(self.handle, self.pin, self.pwm_frequency, 0)
+                # 핀 해제
+                lgpio.gpio_free(self.handle, self.pin)
+                # 핸들 닫기
+                lgpio.gpiochip_close(self.handle)
+                logger.info("GPIO 정리 완료")
+            except Exception as e:
+                logger.error(f"GPIO 정리 중 오류: {e}")
 
         logger.info("VibrationMotor 종료 완료")
 
