@@ -1,30 +1,24 @@
 """
 L298N 모터드라이버 PWM 제어 테스트 스크립트
 
-🔴 중요한 연결 방법:
+🔴 하드웨어 연결:
 
-방법 1 (권장): GPIO로 모든 핀 제어
-- ENA: GPIO 12 (PWM)
-- IN1: GPIO 5 (방향)
-- IN2: GPIO 6 (방향)
-- ENB: GPIO 13 (PWM)
-- IN3: GPIO 16 (방향)
-- IN4: GPIO 26 (방향)
+PWM 제어 핀:
+- ENA: GPIO 12 (PWM - 모터1 속도 제어)
+- ENB: GPIO 13 (PWM - 모터2 속도 제어)
 
-방법 2 (간단): 한 방향만 사용
-- ENA: GPIO 12 (PWM)
-- IN1: 라즈베리파이의 5V 핀 (물리 핀 2 또는 4)
-- IN2: GND (물리 핀 6, 9, 14, 20, 25, 30, 34, 39 중 하나)
-- ENB: GPIO 13 (PWM)
-- IN3: 라즈베리파이의 5V 핀 (물리 핀 2 또는 4)
-- IN4: GND (물리 핀 6, 9, 14, 20, 25, 30, 34, 39 중 하나)
-
-⚠️  IN1과 IN2가 둘 다 HIGH이거나 둘 다 LOW이면 모터가 작동하지 않습니다!
-   반드시 IN1=HIGH, IN2=LOW 또는 그 반대여야 합니다.
+방향 제어 핀 (고정 연결):
+- IN1: 라즈베리파이 5V 핀 (물리 핀 2 또는 4)
+- IN2: 라즈베리파이 GND 핀 (물리 핀 6, 9, 14, 20, 25, 30, 34, 39 중 하나)
+- IN3: 라즈베리파이 5V 핀 (물리 핀 2 또는 4)
+- IN4: 라즈베리파이 GND 핀 (물리 핀 6, 9, 14, 20, 25, 30, 34, 39 중 하나)
 
 전원:
 - L298N 12V 입력: 12V 외부 전원
 - L298N GND: 라즈베리파이 GND와 공통 연결 필수!
+
+⚠️  IN1=5V, IN2=GND로 고정되어 있어 모터는 한 방향으로만 회전합니다.
+   PWM(ENA, ENB)으로만 속도를 제어합니다.
 """
 
 import time
@@ -39,31 +33,25 @@ except ImportError:
 
 
 class L298NMotorController:
-    """L298N 모터 드라이버 PWM 제어 클래스 (GPIO로 IN 핀 제어)"""
+    """L298N 모터 드라이버 PWM 제어 클래스 (IN 핀은 5V/GND 직접 연결)"""
     
-    def __init__(self, 
-                 ena_pin=12, in1_pin=5, in2_pin=6,
-                 enb_pin=13, in3_pin=16, in4_pin=26,
-                 pwm_frequency=1000, simulation_mode=False):
+    def __init__(self, ena_pin=12, enb_pin=13, pwm_frequency=1000, simulation_mode=False):
         """
         초기화
         
         Args:
             ena_pin: ENA 핀 번호 (모터1 속도 제어 PWM)
-            in1_pin: IN1 핀 번호 (모터1 방향)
-            in2_pin: IN2 핀 번호 (모터1 방향)
             enb_pin: ENB 핀 번호 (모터2 속도 제어 PWM)
-            in3_pin: IN3 핀 번호 (모터2 방향)
-            in4_pin: IN4 핀 번호 (모터2 방향)
             pwm_frequency: PWM 주파수 (Hz)
             simulation_mode: 시뮬레이션 모드 (실제 GPIO 없이 테스트)
+            
+        하드웨어 연결:
+            - IN1, IN3: 5V (고정)
+            - IN2, IN4: GND (고정)
+            - ENA, ENB: GPIO PWM 제어
         """
         self.ena_pin = ena_pin
-        self.in1_pin = in1_pin
-        self.in2_pin = in2_pin
         self.enb_pin = enb_pin
-        self.in3_pin = in3_pin
-        self.in4_pin = in4_pin
         self.pwm_frequency = pwm_frequency
         self.simulation_mode = simulation_mode
         self.handle = None
@@ -76,35 +64,23 @@ class L298NMotorController:
                 # GPIO 핸들 열기 (라즈베리파이 5는 gpiochip4 사용)
                 self.handle = lgpio.gpiochip_open(4)
                 
-                # IN 핀들을 출력으로 설정하고 초기화
-                lgpio.gpio_claim_output(self.handle, self.in1_pin, 0)
-                lgpio.gpio_claim_output(self.handle, self.in2_pin, 0)
-                lgpio.gpio_claim_output(self.handle, self.in3_pin, 0)
-                lgpio.gpio_claim_output(self.handle, self.in4_pin, 0)
-                
-                # 정방향 설정 (IN1=HIGH, IN2=LOW, IN3=HIGH, IN4=LOW)
-                lgpio.gpio_write(self.handle, self.in1_pin, 1)
-                lgpio.gpio_write(self.handle, self.in2_pin, 0)
-                lgpio.gpio_write(self.handle, self.in3_pin, 1)
-                lgpio.gpio_write(self.handle, self.in4_pin, 0)
-                
                 # PWM 설정 (처음엔 0%)
                 lgpio.tx_pwm(self.handle, self.ena_pin, self.pwm_frequency, 0)
                 lgpio.tx_pwm(self.handle, self.enb_pin, self.pwm_frequency, 0)
                 
                 print(f"✓ GPIO 초기화 완료")
                 print(f"  ENA: GPIO{self.ena_pin} (PWM)")
-                print(f"  IN1: GPIO{self.in1_pin}=HIGH, IN2: GPIO{self.in2_pin}=LOW (정방향)")
                 print(f"  ENB: GPIO{self.enb_pin} (PWM)")
-                print(f"  IN3: GPIO{self.in3_pin}=HIGH, IN4: GPIO{self.in4_pin}=LOW (정방향)")
                 print(f"  PWM 주파수: {self.pwm_frequency} Hz")
+                print(f"  IN1, IN3: 5V (고정)")
+                print(f"  IN2, IN4: GND (고정)")
             except Exception as e:
                 raise RuntimeError(f"GPIO 초기화 실패: {e}")
         else:
             print(f"✓ 시뮬레이션 모드로 초기화")
             print(f"  ENA: GPIO{self.ena_pin}, ENB: GPIO{self.enb_pin}")
-            print(f"  IN1: GPIO{self.in1_pin}, IN2: GPIO{self.in2_pin}")
-            print(f"  IN3: GPIO{self.in3_pin}, IN4: GPIO{self.in4_pin}")
+            print(f"  IN1, IN3: 5V (고정)")
+            print(f"  IN2, IN4: GND (고정)")
     
     def set_motor1_speed(self, duty_cycle):
         """
@@ -158,12 +134,6 @@ class L298NMotorController:
                 # PWM 정지
                 lgpio.tx_pwm(self.handle, self.ena_pin, self.pwm_frequency, 0)
                 lgpio.tx_pwm(self.handle, self.enb_pin, self.pwm_frequency, 0)
-                
-                # IN 핀들 LOW로 설정
-                lgpio.gpio_write(self.handle, self.in1_pin, 0)
-                lgpio.gpio_write(self.handle, self.in2_pin, 0)
-                lgpio.gpio_write(self.handle, self.in3_pin, 0)
-                lgpio.gpio_write(self.handle, self.in4_pin, 0)
                 
                 # GPIO 핸들 닫기
                 lgpio.gpiochip_close(self.handle)
@@ -294,14 +264,14 @@ def main():
     print("=" * 60)
     print()
     print("하드웨어 설정:")
-    print("  [모터1]")
-    print("    - ENA: GPIO 12 (PWM)")
-    print("    - IN1: GPIO 5 (HIGH=정방향)")
-    print("    - IN2: GPIO 6 (LOW)")
-    print("  [모터2]")
-    print("    - ENB: GPIO 13 (PWM)")
-    print("    - IN3: GPIO 16 (HIGH=정방향)")
-    print("    - IN4: GPIO 26 (LOW)")
+    print("  [PWM 제어]")
+    print("    - ENA: GPIO 12 (PWM - 모터1 속도)")
+    print("    - ENB: GPIO 13 (PWM - 모터2 속도)")
+    print("  [방향 제어 (고정 연결)]")
+    print("    - IN1: 5V (라즈베리파이 물리 핀 2 또는 4)")
+    print("    - IN2: GND (라즈베리파이 물리 핀 6, 9, 14, 20, 25, 30, 34, 39 중 하나)")
+    print("    - IN3: 5V (라즈베리파이 물리 핀 2 또는 4)")
+    print("    - IN4: GND (라즈베리파이 물리 핀 6, 9, 14, 20, 25, 30, 34, 39 중 하나)")
     print("  [전원]")
     print("    - 12V → L298N 12V 입력")
     print("    - GND → 라즈베리파이 GND와 L298N GND 공통 연결 필수!")
@@ -310,7 +280,7 @@ def main():
     print("   1. L298N GND와 라즈베리파이 GND가 연결되어 있나요?")
     print("   2. 12V 외부 전원이 L298N에 제대로 연결되어 있나요?")
     print("   3. 모터가 L298N의 OUT1-OUT2, OUT3-OUT4에 연결되어 있나요?")
-    print("   4. GPIO 핀 번호가 BCM 모드 번호인가요? (물리 핀 번호 아님)")
+    print("   4. IN1, IN3는 5V에, IN2, IN4는 GND에 연결되어 있나요?")
     print()
     
     # Raspberry Pi 환경 감지
@@ -328,8 +298,8 @@ def main():
     try:
         # 컨트롤러 초기화
         controller = L298NMotorController(
-            ena_pin=12, in1_pin=5, in2_pin=6,
-            enb_pin=13, in3_pin=16, in4_pin=26,
+            ena_pin=12,
+            enb_pin=13,
             pwm_frequency=1000,
             simulation_mode=simulation_mode,
         )
